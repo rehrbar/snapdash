@@ -31,7 +31,7 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
         }
 
         // Try to read the file
-        const fileContent = await fs.readFile(filePath);
+        let fileContent = await fs.readFile(filePath, "utf-8");
 
         // Determine content type based on file extension
         const ext = path.extname(filePath).toLowerCase();
@@ -50,6 +50,35 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
 
         const contentType = contentTypes[ext] || "application/octet-stream";
         res.setHeader("Content-Type", contentType);
+
+        // If HTML file, try to apply layout
+        if (ext === ".html") {
+            const layoutPath = path.join(process.cwd(), "data", req.tenant.folder, "_layout.html");
+            try {
+                const layoutContent = await fs.readFile(layoutPath, "utf-8");
+
+                // Replace {{content}} with the actual file content
+                let renderedContent = layoutContent.replace("{{content}}", fileContent);
+
+                // Replace all other {{variable}} placeholders with empty string or tenant data
+                renderedContent = renderedContent.replace(/\{\{(\w+)\}\}/g, (match, variable) => {
+                    // Check if the variable exists in tenant object
+                    if (req.tenant && variable in req.tenant) {
+                        const value = (req.tenant as any)[variable];
+                        return typeof value === "string" ? value : JSON.stringify(value);
+                    }
+                    // Return empty string for undefined variables
+                    return "";
+                });
+
+                fileContent = renderedContent;
+            } catch (layoutError: any) {
+                // If _layout.html doesn't exist, just serve the file as-is
+                if (layoutError.code !== "ENOENT") {
+                    console.error("Error loading layout:", layoutError);
+                }
+            }
+        }
 
         // Send the file content
         res.send(fileContent);
