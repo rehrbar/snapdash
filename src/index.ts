@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import { tenantResolver } from "./middleware/tenantResolver";
+import { fileLoader } from "./middleware/fileLoader";
 
 // Create a new express application instance
 const app = express();
@@ -10,13 +11,8 @@ const port = process.env.PORT || 3000;
 // Apply tenant resolution middleware globally
 app.use(tenantResolver);
 
-// Define the root path with a greeting message
-app.get("/", (req: Request, res: Response) => {
-    res.json({
-        message: "Welcome to the Express + TypeScript Server!",
-        currentTenant: req.tenant || null
-    });
-});
+// Apply file loader middleware to serve files from tenant folders
+app.use(fileLoader);
 
 // Start the Express server
 app.listen(port, () => {

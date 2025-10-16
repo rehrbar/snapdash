@@ -1,7 +1,8 @@
 export type Tenant = {
     hosts: string[],
     name: string,
-    color: string
+    color: string,
+    folder: string
 }
 
 const tenants: Tenant[] = [
@@ -11,14 +12,16 @@ const tenants: Tenant[] = [
             "demo.lvh.me"
         ],
         name: "demo",
-        color: "#07b379ff"
+        color: "#07b379ff",
+        folder: "demo"
     },
     {
         hosts: [
             "explorer.lvh.me"
         ],
         name: "The explorer",
-        color: "#0743b3ff"
+        color: "#0743b3ff",
+        folder: "the-explorer"
     },
 
 ]
