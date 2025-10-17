@@ -30,58 +30,46 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
             return res.status(403).json({ error: "Access denied" });
         }
 
-        // Try to read the file
-        let fileContent = await fs.readFile(filePath, "utf-8");
-
         // Determine content type based on file extension
         const ext = path.extname(filePath).toLowerCase();
-        const contentTypes: { [key: string]: string } = {
-            ".html": "text/html",
-            ".css": "text/css",
-            ".js": "application/javascript",
-            ".json": "application/json",
-            ".png": "image/png",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".gif": "image/gif",
-            ".svg": "image/svg+xml",
-            ".txt": "text/plain"
-        };
 
-        const contentType = contentTypes[ext] || "application/octet-stream";
-        res.setHeader("Content-Type", contentType);
-
-        // If HTML file, try to apply layout
-        if (ext === ".html") {
-            const layoutPath = path.join(process.cwd(), "data", req.tenant.folder, "_layout.html");
-            try {
-                const layoutContent = await fs.readFile(layoutPath, "utf-8");
-
-                // Replace {{content}} with the actual file content
-                let renderedContent = layoutContent.replace("{{content}}", fileContent);
-
-                // Replace all other {{variable}} placeholders with empty string or tenant data
-                renderedContent = renderedContent.replace(/\{\{(\w+)\}\}/g, (match, variable) => {
-                    // Check if the variable exists in tenant object
-                    if (req.tenant && variable in req.tenant) {
-                        const value = (req.tenant as any)[variable];
-                        return typeof value === "string" ? value : JSON.stringify(value);
-                    }
-                    // Return empty string for undefined variables
-                    return "";
-                });
-
-                fileContent = renderedContent;
-            } catch (layoutError: any) {
-                // If _layout.html doesn't exist, just serve the file as-is
-                if (layoutError.code !== "ENOENT") {
-                    console.error("Error loading layout:", layoutError);
-                }
-            }
+        // Only HTML files are rendered, others can be sent directly.
+        if (ext !== ".html") {
+            res.sendFile(filePath);
+            return;
         }
 
-        // Send the file content
-        res.send(fileContent);
+        // Read the file (as text or binary)
+        const fileContent = await fs.readFile(filePath, "utf-8")
+
+        res.setHeader("Content-Type", "text/html");
+
+        const layoutPath = path.join(process.cwd(), "data", req.tenant.folder, "_layout.html");
+        try {
+            const layoutContent = await fs.readFile(layoutPath, "utf-8");
+
+            // Replace {{content}} with the actual file content
+            let renderedContent = layoutContent.replace("{{content}}", fileContent);
+
+            // Replace all other {{variable}} placeholders with empty string or tenant data
+            renderedContent = renderedContent.replace(/\{\{(\w+)\}\}/g, (match, variable) => {
+                // Check if the variable exists in tenant object
+                if (req.tenant && variable in req.tenant) {
+                    const value = (req.tenant as any)[variable];
+                    return typeof value === "string" ? value : JSON.stringify(value);
+                }
+                // Return empty string for undefined variables
+                return "";
+            });
+
+            res.send(renderedContent);
+        } catch (layoutError: any) {
+            // If _layout.html doesn't exist, just serve the file as-is
+            if (layoutError.code !== "ENOENT") {
+                console.error("Error loading layout:", layoutError);
+            }
+            res.send(fileContent);
+        }
     } catch (error: any) {
         // If file not found, pass to next middleware/route handler
         if (error.code === "ENOENT") {
