@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import tenants, { Tenant } from "../tenants";
+import { Tenant } from "../tenants";
+import * as tenantService from "../db/tenantService";
 
 // Extend Express Request type to include tenant
 declare global {
@@ -18,8 +19,8 @@ export const tenantResolver = (req: Request, res: Response, next: NextFunction) 
     // Get the hostname from the request
     const hostname = req.hostname;
 
-    // Find the tenant that matches this hostname
-    const tenant = tenants.find(t => t.hosts.includes(hostname));
+    // Find the tenant that matches this hostname from database
+    const tenant = tenantService.findTenantByHost(hostname);
 
     if (tenant) {
         // Attach the tenant to the request context

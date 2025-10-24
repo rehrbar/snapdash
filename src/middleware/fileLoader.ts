@@ -51,6 +51,8 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
             // Replace {{content}} with the actual file content
             let renderedContent = layoutContent.replace("{{content}}", fileContent);
 
+            // TODO add an allow list for tenant variables which can be used in html.
+
             // Replace all other {{variable}} placeholders with empty string or tenant data
             renderedContent = renderedContent.replace(/\{\{(\w+)\}\}/g, (match, variable) => {
                 // Check if the variable exists in tenant object
