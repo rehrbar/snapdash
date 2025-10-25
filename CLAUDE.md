@@ -4,48 +4,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SnapDash is a quick web development project built with Express and TypeScript. It's a minimal Node.js web server setup designed for rapid prototyping.
+SnapDash is a multi-project rapid web development platform with two main components:
+- **Server**: Express and TypeScript backend API with SQLite database for project management
+- **UI**: (Planned) Frontend interface for managing projects
+
+## Project Structure
+```
+/app
+├── server/               # Backend server application
+│   ├── src/
+│   │   ├── index.ts     # Main application entry point
+│   │   ├── api/         # API route handlers
+│   │   ├── db/          # Database layer and services
+│   │   └── middleware/  # Express middleware
+│   ├── data/            # SQLite database and project files
+│   ├── dist/            # Compiled output (gitignored)
+│   ├── package.json
+│   └── tsconfig.json
+└── CLAUDE.md            # This file
+```
 
 ## Development Commands
 
-### Start Development Server
+### Server Development
+
+Navigate to the `server` directory for all server commands:
+
+```bash
+cd server
+```
+
+#### Start Development Server
 ```bash
 npm start
 ```
 Runs the server in watch mode with hot-reloading using tsx. The server automatically restarts when source files change. Uses `.env` file for environment variables.
 
-### Build
+#### Build
 ```bash
 npm run build
 ```
 Compiles TypeScript to JavaScript using the TypeScript compiler. Output goes to `./dist` directory.
 
-### Run Compiled Code
+#### Run Compiled Code
 After building, the compiled JavaScript is in `dist/index.js`, though there's no explicit run command for production.
 
-## Architecture
+## Server Architecture
 
 ### Tech Stack
 - **Runtime**: Node.js with ES modules (`"type": "module"`)
 - **Framework**: Express 5.x
 - **Language**: TypeScript with strict mode enabled
+- **Database**: SQLite (better-sqlite3)
+- **Validation**: Zod
 - **Dev Tooling**: tsx for development with watch mode
 
-### Project Structure
-```
-/app
-├── src/
-│   └── index.ts          # Main application entry point
-├── dist/                 # Compiled output (gitignored)
-├── package.json
-└── tsconfig.json
-```
-
 ### Application Entry Point
-The application is a single-file Express server (`src/index.ts`) that:
+The application is an Express server (`server/src/index.ts`) that:
+- Initializes SQLite database with project schema
 - Creates an Express app instance
 - Configures port from `process.env.PORT` (defaults to 3000)
-- Exposes a root endpoint (`/`) returning a JSON welcome message
+- Mounts project management API routes at `/api/projects`
+- Applies project resolution middleware for host-based routing
+- Serves static files from project-specific folders
 - Starts listening on the configured port
 
 ### TypeScript Configuration
@@ -58,4 +79,4 @@ The application is a single-file Express server (`src/index.ts`) that:
 
 ## Environment Variables
 - `PORT`: Server port (default: 3000)
-- Additional environment variables can be added to `.env` file (loaded automatically by npm start)
+- Additional environment variables can be added to `.env` file in the `server` directory (loaded automatically by npm start)
