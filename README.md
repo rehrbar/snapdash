@@ -1,10 +1,10 @@
 # SnapDash
 
-A multi-tenant rapid web development platform with host-based routing, dynamic project management, and integrated file storage.
+A multi-project rapid web development platform with host-based routing, dynamic project management, and integrated file storage.
 
 ## Features
 
-- **Multi-Tenant Architecture**: Host-based routing automatically resolves tenants from domain names
+- **Multi-Project Architecture**: Host-based routing automatically resolves projects from domain names
 - **Dynamic Project Management**: Create and manage multiple projects without extensive setup
 - **Integrated File Storage**: Static assets (JS, HTML, CSS, images) stored in MongoDB or object storage
 - **Serverless API Functions**: Deploy small functions that execute in isolated sandboxes

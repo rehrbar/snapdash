@@ -1,19 +1,19 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import * as tenantService from "../db/tenantService";
+import * as projectService from "../db/projectService";
 
-// Create a new router for tenant API endpoints
-export const tenantsRouter = Router();
+// Create a new router for project API endpoints
+export const projectsRouter = Router();
 
-// Zod schema for tenant creation
-const createTenantSchema = z.object({
+// Zod schema for project creation
+const createProjectSchema = z.object({
     hosts: z.array(z.string()).min(1, "At least one host is required"),
     name: z.string().min(1, "Name is required"),
     color: z.string().regex(/^#[0-9a-fA-F]{6,8}$/, "Color must be a valid hex color (e.g., #07b379ff)")
 });
 
-// Zod schema for tenant update
-const updateTenantSchema = z.object({
+// Zod schema for project update
+const updateProjectSchema = z.object({
     name: z.string().min(1, "Name is required").optional(),
     color: z.string().regex(/^#[0-9a-fA-F]{6,8}$/, "Color must be a valid hex color").optional(),
     hosts: z.array(z.string()).min(1, "At least one host is required").optional()
@@ -24,17 +24,17 @@ const updateTenantSchema = z.object({
 // Zod schema for host transfer
 const transferHostSchema = z.object({
     host: z.string().min(1, "Host is required"),
-    targetTenantId: z.number().int().positive("Target tenant ID must be a positive integer")
+    targetProjectId: z.number().int().positive("Target project ID must be a positive integer")
 });
 
 /**
- * POST /api/tenants
- * Create a new tenant
+ * POST /api/projects
+ * Create a new project
  */
-tenantsRouter.post("/tenants", (req: Request, res: Response) => {
+projectsRouter.post("/projects", (req: Request, res: Response) => {
     try {
         // Validate request body with Zod
-        const validationResult = createTenantSchema.safeParse(req.body);
+        const validationResult = createProjectSchema.safeParse(req.body);
 
         if (!validationResult.success) {
             res.status(400).json({
@@ -47,7 +47,7 @@ tenantsRouter.post("/tenants", (req: Request, res: Response) => {
         const { hosts, name, color } = validationResult.data;
 
         // Check if any of the hosts already exist
-        const duplicateHosts = hosts.filter(h => tenantService.hostExists(h));
+        const duplicateHosts = hosts.filter(h => projectService.hostExists(h));
 
         if (duplicateHosts.length > 0) {
             res.status(409).json({
@@ -57,16 +57,16 @@ tenantsRouter.post("/tenants", (req: Request, res: Response) => {
             return;
         }
 
-        // Create the new tenant (folder name is auto-generated)
-        const newTenant = tenantService.createTenant(name, color, hosts);
+        // Create the new project (folder name is auto-generated)
+        const newProject = projectService.createProject(name, color, hosts);
 
         // Return success response
         res.status(201).json({
-            message: "Tenant created successfully",
-            tenant: newTenant
+            message: "Project created successfully",
+            project: newProject
         });
     } catch (error) {
-        console.error("Error creating tenant:", error);
+        console.error("Error creating project:", error);
         res.status(500).json({
             error: "Internal server error"
         });
@@ -74,46 +74,46 @@ tenantsRouter.post("/tenants", (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/tenants
- * List all tenants
+ * GET /api/projects
+ * List all projects
  */
-tenantsRouter.get("/tenants", (req: Request, res: Response) => {
-    const allTenants = tenantService.getAllTenants();
+projectsRouter.get("/projects", (req: Request, res: Response) => {
+    const allProjects = projectService.getAllProjects();
     res.json({
-        tenants: allTenants,
-        count: allTenants.length
+        projects: allProjects,
+        count: allProjects.length
     });
 });
 
 /**
- * GET /api/tenants/:id
- * Get a single tenant by ID
+ * GET /api/projects/:id
+ * Get a single project by ID
  */
-tenantsRouter.get("/tenants/:id", (req: Request, res: Response) => {
+projectsRouter.get("/projects/:id", (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id, 10);
 
         if (isNaN(id)) {
             res.status(400).json({
-                error: "Invalid tenant ID"
+                error: "Invalid project ID"
             });
             return;
         }
 
-        const tenant = tenantService.findTenantById(id);
+        const project = projectService.findProjectById(id);
 
-        if (!tenant) {
+        if (!project) {
             res.status(404).json({
-                error: "Tenant not found"
+                error: "Project not found"
             });
             return;
         }
 
         res.json({
-            tenant
+            project
         });
     } catch (error) {
-        console.error("Error fetching tenant:", error);
+        console.error("Error fetching project:", error);
         res.status(500).json({
             error: "Internal server error"
         });
@@ -121,22 +121,22 @@ tenantsRouter.get("/tenants/:id", (req: Request, res: Response) => {
 });
 
 /**
- * PUT /api/tenants/:id
- * Update an existing tenant
+ * PUT /api/projects/:id
+ * Update an existing project
  */
-tenantsRouter.put("/tenants/:id", (req: Request, res: Response) => {
+projectsRouter.put("/projects/:id", (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id, 10);
 
         if (isNaN(id)) {
             res.status(400).json({
-                error: "Invalid tenant ID"
+                error: "Invalid project ID"
             });
             return;
         }
 
         // Validate request body with Zod
-        const validationResult = updateTenantSchema.safeParse(req.body);
+        const validationResult = updateProjectSchema.safeParse(req.body);
 
         if (!validationResult.success) {
             res.status(400).json({
@@ -148,47 +148,47 @@ tenantsRouter.put("/tenants/:id", (req: Request, res: Response) => {
 
         const updates = validationResult.data;
 
-        // If updating hosts, check for duplicates (excluding current tenant's hosts)
+        // If updating hosts, check for duplicates (excluding current project's hosts)
         if (updates.hosts) {
-            const currentTenant = tenantService.findTenantById(id);
-            if (!currentTenant) {
+            const currentProject = projectService.findProjectById(id);
+            if (!currentProject) {
                 res.status(404).json({
-                    error: "Tenant not found"
+                    error: "Project not found"
                 });
                 return;
             }
 
-            // Check if any of the new hosts are already used by other tenants
+            // Check if any of the new hosts are already used by other projects
             const duplicateHosts = updates.hosts.filter(h => {
-                // Host is duplicate if it exists and is not in the current tenant's hosts
-                return tenantService.hostExists(h) && !currentTenant.hosts.includes(h);
+                // Host is duplicate if it exists and is not in the current project's hosts
+                return projectService.hostExists(h) && !currentProject.hosts.includes(h);
             });
 
             if (duplicateHosts.length > 0) {
                 res.status(409).json({
-                    error: "The following hosts are already registered to other tenants",
+                    error: "The following hosts are already registered to other projects",
                     hosts: duplicateHosts
                 });
                 return;
             }
         }
 
-        // Update the tenant
-        const updatedTenant = tenantService.updateTenant(id, updates);
+        // Update the project
+        const updatedProject = projectService.updateProject(id, updates);
 
-        if (!updatedTenant) {
+        if (!updatedProject) {
             res.status(404).json({
-                error: "Tenant not found"
+                error: "Project not found"
             });
             return;
         }
 
         res.json({
-            message: "Tenant updated successfully",
-            tenant: updatedTenant
+            message: "Project updated successfully",
+            project: updatedProject
         });
     } catch (error) {
-        console.error("Error updating tenant:", error);
+        console.error("Error updating project:", error);
         res.status(500).json({
             error: "Internal server error"
         });
@@ -196,34 +196,34 @@ tenantsRouter.put("/tenants/:id", (req: Request, res: Response) => {
 });
 
 /**
- * DELETE /api/tenants/:id
- * Delete a tenant
+ * DELETE /api/projects/:id
+ * Delete a project
  */
-tenantsRouter.delete("/tenants/:id", (req: Request, res: Response) => {
+projectsRouter.delete("/projects/:id", (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id, 10);
 
         if (isNaN(id)) {
             res.status(400).json({
-                error: "Invalid tenant ID"
+                error: "Invalid project ID"
             });
             return;
         }
 
-        const deleted = tenantService.deleteTenant(id);
+        const deleted = projectService.deleteProject(id);
 
         if (!deleted) {
             res.status(404).json({
-                error: "Tenant not found"
+                error: "Project not found"
             });
             return;
         }
 
         res.json({
-            message: "Tenant deleted successfully"
+            message: "Project deleted successfully"
         });
     } catch (error) {
-        console.error("Error deleting tenant:", error);
+        console.error("Error deleting project:", error);
         res.status(500).json({
             error: "Internal server error"
         });
@@ -231,10 +231,10 @@ tenantsRouter.delete("/tenants/:id", (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/tenants/transfer-host
- * Transfer a hostname from one tenant to another
+ * POST /api/projects/transfer-host
+ * Transfer a hostname from one project to another
  */
-tenantsRouter.post("/tenants/transfer-host", (req: Request, res: Response) => {
+projectsRouter.post("/projects/transfer-host", (req: Request, res: Response) => {
     try {
         // Validate request body with Zod
         const validationResult = transferHostSchema.safeParse(req.body);
@@ -247,10 +247,10 @@ tenantsRouter.post("/tenants/transfer-host", (req: Request, res: Response) => {
             return;
         }
 
-        const { host, targetTenantId } = validationResult.data;
+        const { host, targetProjectId } = validationResult.data;
 
         // Check if host exists
-        if (!tenantService.hostExists(host)) {
+        if (!projectService.hostExists(host)) {
             res.status(404).json({
                 error: "Host not found"
             });
@@ -258,11 +258,11 @@ tenantsRouter.post("/tenants/transfer-host", (req: Request, res: Response) => {
         }
 
         // Transfer the host
-        const transferred = tenantService.transferHost(host, targetTenantId);
+        const transferred = projectService.transferHost(host, targetProjectId);
 
         if (!transferred) {
             res.status(404).json({
-                error: "Target tenant not found or host does not exist"
+                error: "Target project not found or host does not exist"
             });
             return;
         }
@@ -270,7 +270,7 @@ tenantsRouter.post("/tenants/transfer-host", (req: Request, res: Response) => {
         res.json({
             message: "Host transferred successfully",
             host,
-            targetTenantId
+            targetProjectId
         });
     } catch (error) {
         console.error("Error transferring host:", error);

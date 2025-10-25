@@ -3,15 +3,15 @@ import path from "path";
 import fs from "fs/promises";
 
 /**
- * Middleware to load and serve files from the tenant's data folder
+ * Middleware to load and serve files from the project's data folder
  * If no file is specified, serves index.html
- * Returns 404 if tenant is not found or file doesn't exist
+ * Returns 404 if project is not found or file doesn't exist
  */
 export const fileLoader = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        // Check if tenant is resolved
-        if (!req.tenant) {
-            return res.status(404).json({ error: "Tenant not found" });
+        // Check if project is resolved
+        if (!req.project) {
+            return res.status(404).json({ error: "Project not found" });
         }
 
         // Get the requested path, default to index.html if root
@@ -21,10 +21,10 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
         requestedPath = requestedPath.startsWith("/") ? requestedPath.slice(1) : requestedPath;
 
         // Build the full file path
-        const filePath = path.join(process.cwd(), "data", req.tenant.folder, requestedPath);
+        const filePath = path.join(process.cwd(), "data", req.project.folder, requestedPath);
 
-        // Security check: ensure the resolved path is within the tenant's folder
-        const dataDir = path.join(process.cwd(), "data", req.tenant.folder);
+        // Security check: ensure the resolved path is within the project's folder
+        const dataDir = path.join(process.cwd(), "data", req.project.folder);
         const resolvedPath = path.resolve(filePath);
         if (!resolvedPath.startsWith(dataDir)) {
             return res.status(403).json({ error: "Access denied" });
@@ -44,20 +44,20 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
 
         res.setHeader("Content-Type", "text/html");
 
-        const layoutPath = path.join(process.cwd(), "data", req.tenant.folder, "_layout.html");
+        const layoutPath = path.join(process.cwd(), "data", req.project.folder, "_layout.html");
         try {
             const layoutContent = await fs.readFile(layoutPath, "utf-8");
 
             // Replace {{content}} with the actual file content
             let renderedContent = layoutContent.replace("{{content}}", fileContent);
 
-            // TODO add an allow list for tenant variables which can be used in html.
+            // TODO add an allow list for project variables which can be used in html.
 
-            // Replace all other {{variable}} placeholders with empty string or tenant data
+            // Replace all other {{variable}} placeholders with empty string or project data
             renderedContent = renderedContent.replace(/\{\{(\w+)\}\}/g, (match, variable) => {
-                // Check if the variable exists in tenant object
-                if (req.tenant && variable in req.tenant) {
-                    const value = (req.tenant as any)[variable];
+                // Check if the variable exists in project object
+                if (req.project && variable in req.project) {
+                    const value = (req.project as any)[variable];
                     return typeof value === "string" ? value : JSON.stringify(value);
                 }
                 // Return empty string for undefined variables

@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
-import { tenantResolver } from "./middleware/tenantResolver";
+import { projectResolver } from "./middleware/projectResolver";
 import { fileLoader } from "./middleware/fileLoader";
-import { tenantsRouter } from "./api/tenants";
+import { projectsRouter } from "./api/projects";
 import { initializeDatabase, seedDatabase } from "./db/database";
 
 // Initialize database
@@ -18,12 +18,12 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 
 // Mount API routes
-app.use("/api", tenantsRouter);
+app.use("/api", projectsRouter);
 
-// Apply tenant resolution middleware globally
-app.use(tenantResolver);
+// Apply project resolution middleware globally
+app.use(projectResolver);
 
-// Apply file loader middleware to serve files from tenant folders
+// Apply file loader middleware to serve files from project folders
 app.use(fileLoader);
 
 // Start the Express server

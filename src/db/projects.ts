@@ -1,4 +1,4 @@
-export type Tenant = {
+export type Project = {
     id?: number,
     hosts: string[],
     name: string,
