@@ -1,5 +1,5 @@
 import { db } from "./database";
-import { Tenant } from "../tenants";
+import { Tenant } from "./tenants";
 
 export interface TenantRow {
     id: number;
@@ -20,6 +20,7 @@ export interface TenantHostRow {
  */
 function rowsToTenant(tenantRow: TenantRow, hostRows: TenantHostRow[]): Tenant {
     return {
+        id: tenantRow.id,
         name: tenantRow.name,
         color: tenantRow.color,
         folder: tenantRow.folder,
@@ -117,6 +118,25 @@ export function generateUniqueFolderName(name: string): string {
 }
 
 /**
+ * Find tenant by ID
+ */
+export function findTenantById(id: number): Tenant | undefined {
+    const tenantRow = db.prepare(`
+        SELECT * FROM tenants WHERE id = ?
+    `).get(id) as TenantRow | undefined;
+
+    if (!tenantRow) {
+        return undefined;
+    }
+
+    const hostRows = db.prepare(`
+        SELECT * FROM tenant_hosts WHERE tenant_id = ?
+    `).all(tenantRow.id) as TenantHostRow[];
+
+    return rowsToTenant(tenantRow, hostRows);
+}
+
+/**
  * Create a new tenant
  */
 export function createTenant(name: string, color: string, hosts: string[]): Tenant {
@@ -158,4 +178,123 @@ export function createTenant(name: string, color: string, hosts: string[]): Tena
     `).all(tenantId) as TenantHostRow[];
 
     return rowsToTenant(tenantRow, hostRows);
+}
+
+/**
+ * Update an existing tenant
+ */
+export function updateTenant(id: number, updates: { name?: string; color?: string; hosts?: string[] }): Tenant | null {
+    const tenantRow = db.prepare(`
+        SELECT * FROM tenants WHERE id = ?
+    `).get(id) as TenantRow | undefined;
+
+    if (!tenantRow) {
+        return null;
+    }
+
+    // TODO ensure an update does not break existing tenants with duplicated hosts.
+
+    const transaction = db.transaction(() => {
+        // Update tenant fields if provided
+        if (updates.name !== undefined || updates.color !== undefined) {
+            const name = updates.name !== undefined ? updates.name : tenantRow.name;
+            const color = updates.color !== undefined ? updates.color : tenantRow.color;
+
+            db.prepare(`
+                UPDATE tenants SET name = ?, color = ? WHERE id = ?
+            `).run(name, color, id);
+        }
+
+        // Update hosts if provided
+        if (updates.hosts !== undefined) {
+            // Delete existing hosts
+            db.prepare(`
+                DELETE FROM tenant_hosts WHERE tenant_id = ?
+            `).run(id);
+
+            // Insert new hosts
+            const insertHost = db.prepare(`
+                INSERT INTO tenant_hosts (tenant_id, host)
+                VALUES (?, ?)
+            `);
+
+            for (const host of updates.hosts) {
+                insertHost.run(id, host);
+            }
+        }
+
+        return id;
+    });
+
+    transaction();
+
+    // Fetch and return the updated tenant
+    const updatedTenantRow = db.prepare(`
+        SELECT * FROM tenants WHERE id = ?
+    `).get(id) as TenantRow;
+
+    const hostRows = db.prepare(`
+        SELECT * FROM tenant_hosts WHERE tenant_id = ?
+    `).all(id) as TenantHostRow[];
+
+    return rowsToTenant(updatedTenantRow, hostRows);
+}
+
+/**
+ * Delete a tenant by ID
+ */
+export function deleteTenant(id: number): boolean {
+    const tenantRow = db.prepare(`
+        SELECT * FROM tenants WHERE id = ?
+    `).get(id) as TenantRow | undefined;
+
+    if (!tenantRow) {
+        return false;
+    }
+
+    // Use a transaction to ensure atomicity
+    const transaction = db.transaction(() => {
+        // Delete hosts (will be deleted automatically due to CASCADE)
+        db.prepare(`
+            DELETE FROM tenant_hosts WHERE tenant_id = ?
+        `).run(id);
+
+        // Delete tenant
+        db.prepare(`
+            DELETE FROM tenants WHERE id = ?
+        `).run(id);
+    });
+
+    transaction();
+    return true;
+}
+
+/**
+ * Transfer a hostname from one tenant to another
+ */
+export function transferHost(host: string, targetTenantId: number): boolean {
+    // Check if host exists
+    const hostRow = db.prepare(`
+        SELECT * FROM tenant_hosts WHERE host = ?
+    `).get(host) as TenantHostRow | undefined;
+
+    if (!hostRow) {
+        return false;
+    }
+
+    // Find target tenant
+    const targetTenant = db.prepare(`
+        SELECT * FROM tenants WHERE id = ?
+    `).get(targetTenantId) as TenantRow | undefined;
+
+    if (!targetTenant) {
+        return false;
+    }
+
+    // Update the host's tenant_id
+    db.prepare(`
+        UPDATE tenant_hosts SET tenant_id = ? WHERE host = ?
+    `).run(targetTenantId, host);
+
+    return true;
 }

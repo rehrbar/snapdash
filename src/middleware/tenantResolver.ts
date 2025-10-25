@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { Tenant } from "../tenants";
+import { Tenant } from "../db/tenants";
 import * as tenantService from "../db/tenantService";
 
 // Extend Express Request type to include tenant
