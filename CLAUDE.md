@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SnapDash is a multi-project rapid web development platform with two main components:
 - **Server**: Express and TypeScript backend API with SQLite database for project management
-- **UI**: (Planned) Frontend interface for managing projects
+- **Admin UI**: React-based admin UI for managing projects
 
 ## Project Structure
 ```
@@ -21,6 +21,11 @@ SnapDash is a multi-project rapid web development platform with two main compone
 │   ├── dist/            # Compiled output (gitignored)
 │   ├── package.json
 │   └── tsconfig.json
+├── admin/                # React admin UI application
+│   ├── src/             # React components and application code
+│   ├── public/          # Static assets
+│   ├── build/           # Production build output (gitignored)
+│   └── package.json
 └── CLAUDE.md            # This file
 ```
 
@@ -49,6 +54,39 @@ Compiles TypeScript to JavaScript using the TypeScript compiler. Output goes to 
 #### Run Compiled Code
 After building, the compiled JavaScript is in `dist/index.js`, though there's no explicit run command for production.
 
+### Admin Development
+
+Navigate to the `admin` directory for all admin UI commands:
+
+```bash
+cd admin
+```
+
+#### Start Development Server
+```bash
+npm start
+```
+Runs the React app in development mode with hot-reloading. Opens [http://localhost:3000](http://localhost:3000) in the browser. The page reloads when you make changes.
+
+#### Build
+```bash
+npm run build
+```
+Builds the React app for production to the `build` directory. Optimizes the build for best performance with minified bundles.
+
+#### Run Tests
+```bash
+npm test
+```
+Launches the test runner in interactive watch mode using React Testing Library.
+
+## Admin Architecture
+
+### Tech Stack
+- **Framework**: React 19.x
+- **Build Tool**: Create React App (react-scripts)
+- **Testing**: React Testing Library, Jest
+
 ## Server Architecture
 
 ### Tech Stack
@@ -63,7 +101,7 @@ After building, the compiled JavaScript is in `dist/index.js`, though there's no
 The application is an Express server (`server/src/index.ts`) that:
 - Initializes SQLite database with project schema
 - Creates an Express app instance
-- Configures port from `process.env.PORT` (defaults to 3000)
+- Configures port from `process.env.PORT` (defaults to 3001)
 - Mounts project management API routes at `/api/projects`
 - Applies project resolution middleware for host-based routing
 - Serves static files from project-specific folders
@@ -78,5 +116,5 @@ The application is an Express server (`server/src/index.ts`) that:
 - **Include**: All files in `src/**/*`
 
 ## Environment Variables
-- `PORT`: Server port (default: 3000)
+- `PORT`: Server port (default: 3001)
 - Additional environment variables can be added to `.env` file in the `server` directory (loaded automatically by npm start)
