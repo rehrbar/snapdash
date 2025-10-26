@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import * as projectService from "../db/projectService";
+import cors from "cors";
 
 // Create a new router for project API endpoints
 export const projectsRouter = Router();
@@ -26,6 +27,8 @@ const transferHostSchema = z.object({
     host: z.string().min(1, "Host is required"),
     targetProjectId: z.number().int().positive("Target project ID must be a positive integer")
 });
+
+projectsRouter.use(cors());
 
 /**
  * POST /api/projects
