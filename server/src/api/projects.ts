@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import * as projectService from "../db/projectService.js";
 import cors from "cors";
+import path from "path";
+import fs from "fs/promises";
 
 // Create a new router for project API endpoints
 export const projectsRouter = Router();
@@ -277,6 +279,324 @@ projectsRouter.post("/projects/transfer-host", (req: Request, res: Response) => 
         });
     } catch (error) {
         console.error("Error transferring host:", error);
+        res.status(500).json({
+            error: "Internal server error"
+        });
+    }
+});
+
+/**
+ * Helper function to recursively list all files in a directory
+ */
+async function listFilesRecursively(dirPath: string, baseDir: string): Promise<string[]> {
+    const files: string[] = [];
+
+    try {
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const fullPath = path.join(dirPath, entry.name);
+
+            if (entry.isDirectory()) {
+                const subFiles = await listFilesRecursively(fullPath, baseDir);
+                files.push(...subFiles);
+            } else if (entry.isFile()) {
+                // Get relative path from base directory
+                const relativePath = path.relative(baseDir, fullPath);
+                files.push(relativePath);
+            }
+        }
+    } catch (error) {
+        console.error(`Error reading directory ${dirPath}:`, error);
+    }
+
+    return files;
+}
+
+/**
+ * GET /api/projects/:id/files
+ * List all files in a project
+ */
+projectsRouter.get("/projects/:id/files", async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+
+        if (isNaN(id)) {
+            res.status(400).json({
+                error: "Invalid project ID"
+            });
+            return;
+        }
+
+        const project = projectService.findProjectById(id);
+
+        if (!project) {
+            res.status(404).json({
+                error: "Project not found"
+            });
+            return;
+        }
+
+        // Build the project folder path
+        const projectPath = path.join(process.cwd(), "data", project.folder);
+
+        // Check if directory exists
+        try {
+            await fs.access(projectPath);
+        } catch {
+            res.json({
+                project: project.name,
+                files: []
+            });
+            return;
+        }
+
+        // List all files recursively
+        const files = await listFilesRecursively(projectPath, projectPath);
+
+        res.json({
+            project: project.name,
+            folder: project.folder,
+            files: files.sort(),
+            count: files.length
+        });
+    } catch (error) {
+        console.error("Error listing files:", error);
+        res.status(500).json({
+            error: "Internal server error"
+        });
+    }
+});
+
+/**
+ * GET /api/projects/:id/file?path=xxx
+ * Get a specific file's content
+ */
+projectsRouter.get("/projects/:id/file", async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+
+        if (isNaN(id)) {
+            res.status(400).json({
+                error: "Invalid project ID"
+            });
+            return;
+        }
+
+        const project = projectService.findProjectById(id);
+
+        if (!project) {
+            res.status(404).json({
+                error: "Project not found"
+            });
+            return;
+        }
+
+        // Get the file path from query parameter
+        const filePath = req.query.path as string;
+
+        if (!filePath) {
+            res.status(400).json({
+                error: "File path is required"
+            });
+            return;
+        }
+
+        // Build the full file path
+        const projectPath = path.join(process.cwd(), "data", project.folder);
+        const fullFilePath = path.join(projectPath, filePath);
+
+        // Security check: ensure the resolved path is within the project's folder
+        const resolvedPath = path.resolve(fullFilePath);
+        if (!resolvedPath.startsWith(projectPath)) {
+            res.status(403).json({
+                error: "Access denied"
+            });
+            return;
+        }
+
+        // Check if file exists and is a file
+        try {
+            const stats = await fs.stat(fullFilePath);
+            if (!stats.isFile()) {
+                res.status(400).json({
+                    error: "Path is not a file"
+                });
+                return;
+            }
+        } catch {
+            res.status(404).json({
+                error: "File not found"
+            });
+            return;
+        }
+
+        // Read file content
+        const content = await fs.readFile(fullFilePath, "utf-8");
+
+        res.json({
+            project: project.name,
+            folder: project.folder,
+            path: filePath,
+            content
+        });
+    } catch (error) {
+        console.error("Error reading file:", error);
+        res.status(500).json({
+            error: "Internal server error"
+        });
+    }
+});
+
+/**
+ * PUT /api/projects/:id/file
+ * Set/update a file's content
+ */
+projectsRouter.put("/projects/:id/file", async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+
+        if (isNaN(id)) {
+            res.status(400).json({
+                error: "Invalid project ID"
+            });
+            return;
+        }
+
+        const project = projectService.findProjectById(id);
+
+        if (!project) {
+            res.status(404).json({
+                error: "Project not found"
+            });
+            return;
+        }
+
+        // Get the file path and content from request body
+        const { path: filePath, content } = req.body;
+
+        if (!filePath || typeof filePath !== "string") {
+            res.status(400).json({
+                error: "File path is required and must be a string"
+            });
+            return;
+        }
+
+        if (content === undefined || typeof content !== "string") {
+            res.status(400).json({
+                error: "Content is required and must be a string"
+            });
+            return;
+        }
+
+        // Build the full file path
+        const projectPath = path.join(process.cwd(), "data", project.folder);
+        const fullFilePath = path.join(projectPath, filePath);
+
+        // Security check: ensure the resolved path is within the project's folder
+        const resolvedPath = path.resolve(fullFilePath);
+        if (!resolvedPath.startsWith(projectPath)) {
+            res.status(403).json({
+                error: "Access denied"
+            });
+            return;
+        }
+
+        // Ensure parent directory exists
+        const parentDir = path.dirname(fullFilePath);
+        await fs.mkdir(parentDir, { recursive: true });
+
+        // Write the file (overwrites if exists)
+        await fs.writeFile(fullFilePath, content, "utf-8");
+
+        res.json({
+            message: "File saved successfully",
+            project: project.name,
+            folder: project.folder,
+            path: filePath
+        });
+    } catch (error) {
+        console.error("Error writing file:", error);
+        res.status(500).json({
+            error: "Internal server error"
+        });
+    }
+});
+
+/**
+ * DELETE /api/projects/:id/file?path=xxx
+ * Delete a specific file
+ */
+projectsRouter.delete("/projects/:id/file", async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+
+        if (isNaN(id)) {
+            res.status(400).json({
+                error: "Invalid project ID"
+            });
+            return;
+        }
+
+        const project = projectService.findProjectById(id);
+
+        if (!project) {
+            res.status(404).json({
+                error: "Project not found"
+            });
+            return;
+        }
+
+        // Get the file path from query parameter
+        const filePath = req.query.path as string;
+
+        if (!filePath) {
+            res.status(400).json({
+                error: "File path is required"
+            });
+            return;
+        }
+
+        // Build the full file path
+        const projectPath = path.join(process.cwd(), "data", project.folder);
+        const fullFilePath = path.join(projectPath, filePath);
+
+        // Security check: ensure the resolved path is within the project's folder
+        const resolvedPath = path.resolve(fullFilePath);
+        if (!resolvedPath.startsWith(projectPath)) {
+            res.status(403).json({
+                error: "Access denied"
+            });
+            return;
+        }
+
+        // Check if file exists and is a file
+        try {
+            const stats = await fs.stat(fullFilePath);
+            if (!stats.isFile()) {
+                res.status(400).json({
+                    error: "Path is not a file"
+                });
+                return;
+            }
+        } catch {
+            res.status(404).json({
+                error: "File not found"
+            });
+            return;
+        }
+
+        // Delete the file
+        await fs.unlink(fullFilePath);
+
+        res.json({
+            message: "File deleted successfully",
+            project: project.name,
+            folder: project.folder,
+            path: filePath
+        });
+    } catch (error) {
+        console.error("Error deleting file:", error);
         res.status(500).json({
             error: "Internal server error"
         });
