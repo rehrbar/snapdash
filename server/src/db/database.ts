@@ -1,12 +1,13 @@
 import Database from "better-sqlite3";
 import path from "path";
+import { mkdirSync } from "fs";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 // Initialize database connection
-const dbPath = path.join(__dirname, "../../data/projects.db");
+const dbPath = path.join(process.cwd(), "data", "projects.db");
+
+// Create parent directories of database location.
+mkdirSync(path.dirname(dbPath), { recursive: true });
 export const db = new Database(dbPath);
 
 // Enable foreign keys

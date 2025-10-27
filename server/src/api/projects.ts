@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import * as projectService from "../db/projectService";
+import * as projectService from "../db/projectService.js";
 import cors from "cors";
 
 // Create a new router for project API endpoints

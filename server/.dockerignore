@@ -1,0 +1,4 @@
+mode_modules/
+data/
+dist/
+.env

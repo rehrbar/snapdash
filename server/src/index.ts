@@ -1,8 +1,8 @@
 import express, { Request, Response } from "express";
-import { projectResolver } from "./middleware/projectResolver";
-import { fileLoader } from "./middleware/fileLoader";
-import { projectsRouter } from "./api/projects";
-import { initializeDatabase, seedDatabase } from "./db/database";
+import { projectResolver } from "./middleware/projectResolver.js";
+import { fileLoader } from "./middleware/fileLoader.js";
+import { projectsRouter } from "./api/projects.js";
+import { initializeDatabase, seedDatabase } from "./db/database.js";
 
 // Initialize database
 initializeDatabase();

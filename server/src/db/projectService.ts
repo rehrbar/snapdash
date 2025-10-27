@@ -1,5 +1,5 @@
-import { db } from "./database";
-import { Project } from "./projects";
+import { db } from "./database.js";
+import { Project } from "./projects.js";
 
 export interface ProjectRow {
     id: number;

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import { Project } from "../db/projects";
-import * as projectService from "../db/projectService";
+import { Project } from "../db/projects.js";
+import * as projectService from "../db/projectService.js";
 
 // Extend Express Request type to include project
 declare global {
