@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getProjects, deleteProject, Project } from "../services/api";
 import React from "react";
+import { Link } from "react-router";
 
 interface ProjectListProps {
     onEdit: (project: Project) => void;
@@ -49,7 +50,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ onEdit, refreshTrigger }) => 
             {loading && <span>Loading...</span>}
             {error && <div>{error}</div>}
             {!loading && projects.length > 0 && (
-                <table>
+                <table className="text-left w-full">
                     <thead>
                         <tr>
                             <th>ID</th>
@@ -63,40 +64,46 @@ const ProjectList: React.FC<ProjectListProps> = ({ onEdit, refreshTrigger }) => 
                     <tbody>
                         {projects.map(p => (
                             <tr key={p.id}>
-                                <td>{p.id}</td>
-                                <td>{p.name}</td>
-                                <td>
-                                    <div className="flex items-center gap-2">
-                                        <div
-                                            className="w-6 h-6 rounded border border-gray-300"
-                                            style={{ backgroundColor: p.color }}
-                                        ></div>
-                                        {p.color}
-                                    </div>
-                                </td>
-                                <td>{p.folder}</td>
-                                <td>
-                                    {p.hosts.map((h, idx) => (
-                                        <span key={idx} className="border border-gray-300 rounded px-2 py-0.5 mr-1 inline-block">
-                                            {h}
-                                        </span>
-                                    ))}
-                                </td>
-                                <td>
-                                    <button
-                                        onClick={() => onEdit(p)}
-                                        className="bg-blue-500 text-white px-3 py-1.5 rounded border-none cursor-pointer mr-2"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(p.id)}
-                                        className="bg-red-600 text-white px-3 py-1.5 rounded border-none cursor-pointer"
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
+                                    <td>{p.id}</td>
+                                    <td>{p.name}</td>
+                                    <td>
+                                        <div className="flex items-center gap-2">
+                                            <div
+                                                className="w-6 h-6 rounded border border-gray-300"
+                                                style={{ backgroundColor: p.color }}
+                                            ></div>
+                                            {p.color}
+                                        </div>
+                                    </td>
+                                    <td>{p.folder}</td>
+                                    <td>
+                                        {p.hosts.map((h, idx) => (
+                                            <span key={idx} className="border border-gray-300 rounded px-2 py-0.5 mr-1 inline-block">
+                                                {h}
+                                            </span>
+                                        ))}
+                                    </td>
+                                    <td>
+                                        <Link
+                                            to={`/projects/${p.id}/files`}
+                                            className="bg-gray-500 text-white px-3 py-1.5 rounded border-none cursor-pointer mr-2"
+                                        >
+                                            Files
+                                        </Link>
+                                        <button
+                                            onClick={() => onEdit(p)}
+                                            className="bg-blue-500 text-white px-3 py-1.5 rounded border-none cursor-pointer mr-2"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(p.id)}
+                                            className="bg-red-600 text-white px-3 py-1.5 rounded border-none cursor-pointer"
+                                        >
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
                         ))}
                     </tbody>
                 </table>

@@ -77,3 +77,65 @@ export const deleteProject = async (id: number): Promise<void> => {
         throw new Error('Failed to delete project');
     }
 };
+
+export interface ProjectFilesResponse {
+    project: string;
+    files: string[];
+    count: number;
+}
+
+/**
+ * Get all files in a project
+ */
+export const getProjectFiles = async (id: number): Promise<ProjectFilesResponse> => {
+    const response = await fetch(`${config.baseUrl}/api/projects/${id}/files`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch project files');
+    }
+    return response.json();
+};
+
+export interface FileContentResponse {
+    project: string;
+    path: string;
+    content: string;
+}
+
+/**
+ * Get content of a specific file in a project
+ */
+export const getFileContent = async (id: number, filePath: string): Promise<FileContentResponse> => {
+    const response = await fetch(`${config.baseUrl}/api/projects/${id}/file?path=${encodeURIComponent(filePath)}`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch file content');
+    }
+    return response.json();
+};
+
+/**
+ * Update content of a specific file in a project
+ */
+export const updateFileContent = async (id: number, filePath: string, content: string): Promise<void> => {
+    const response = await fetch(`${config.baseUrl}/api/projects/${id}/file`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ path: filePath, content })
+    });
+    if (!response.ok) {
+        throw new Error('Failed to update file content');
+    }
+};
+
+/**
+ * Delete a specific file in a project
+ */
+export const deleteFile = async (id: number, filePath: string): Promise<void> => {
+    const response = await fetch(`${config.baseUrl}/api/projects/${id}/file?path=${encodeURIComponent(filePath)}`, {
+        method: 'DELETE'
+    });
+    if (!response.ok) {
+        throw new Error('Failed to delete file');
+    }
+};

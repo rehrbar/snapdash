@@ -356,7 +356,6 @@ projectsRouter.get("/projects/:id/files", async (req: Request, res: Response) =>
 
         res.json({
             project: project.name,
-            folder: project.folder,
             files: files.sort(),
             count: files.length
         });
@@ -436,7 +435,6 @@ projectsRouter.get("/projects/:id/file", async (req: Request, res: Response) => 
 
         res.json({
             project: project.name,
-            folder: project.folder,
             path: filePath,
             content
         });
@@ -512,7 +510,6 @@ projectsRouter.put("/projects/:id/file", async (req: Request, res: Response) => 
         res.json({
             message: "File saved successfully",
             project: project.name,
-            folder: project.folder,
             path: filePath
         });
     } catch (error) {
@@ -592,7 +589,6 @@ projectsRouter.delete("/projects/:id/file", async (req: Request, res: Response) 
         res.json({
             message: "File deleted successfully",
             project: project.name,
-            folder: project.folder,
             path: filePath
         });
     } catch (error) {
