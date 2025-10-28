@@ -35,9 +35,10 @@ const FileList: React.FC<{}> = () => {
         }
     };
 
+    // TODO fix this eslint warning
     useEffect(() => {
         loadFiles();
-    }, []);
+    }, [projectId]);
 
     const handleFileSelect = async (filePath: string) => {
         setSelectedFile(filePath);

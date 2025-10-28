@@ -5,6 +5,7 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { BrowserRouter, Routes, Route } from 'react-router';
 import FileList from './components/FileList';
+import Navigation from './components/Navigation';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -12,6 +13,7 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <BrowserRouter>
+    <Navigation />
       <Routes>
         <Route index element={<App />} />
         <Route path='projects/:id/files' element={<FileList />} />
