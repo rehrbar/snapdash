@@ -3,6 +3,19 @@ import { getProjectFiles, ProjectFilesResponse, getFileContent, updateFileConten
 import React from "react";
 import { useParams } from "react-router";
 
+const seedIndexHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Title</title>
+</head>
+<body>
+    <h1>Hello World!</h1>
+</body>
+</html>`;
+
 
 const FileList: React.FC<{}> = () => {
     const { id } = useParams();
@@ -121,6 +134,16 @@ const FileList: React.FC<{}> = () => {
         }
     };
 
+    const handleProjectInit = async () => {
+        try {
+            await updateFileContent(projectId, "index.html", seedIndexHtml);
+            // Refresh the file list
+            await loadFiles();
+        } catch (err) {
+            setContentError(err instanceof Error ? err.message : 'Failed to save file');
+        }
+    }
+
     const isDirty = fileContent !== editedContent || editedFileName !== selectedFile;
 
     if(Number.isNaN(projectId)) {
@@ -136,7 +159,10 @@ const FileList: React.FC<{}> = () => {
     }
 
     if (!files || files.files.length === 0) {
-        return <div className="text-gray-500 p-4">No files found in this project.</div>;
+        return <>
+            <div className="text-gray-500 p-4">No files found in this project.</div>
+            <button onClick={() => handleProjectInit()} className="px-4 py-2 rounded bg-blue-500 text-white hover:bg-blue-700">Initialize project</button>
+        </>;
     }
 
     return (
@@ -218,7 +244,7 @@ const FileList: React.FC<{}> = () => {
                                         isDirty && !isSaving && !isDeleting
                                             ? 'bg-green-600 text-white cursor-pointer hover:bg-green-700'
                                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    }`}
+                                        }`}
                                 >
                                     {isSaving ? 'Saving...' : 'Save Changes'}
                                 </button>
@@ -229,7 +255,7 @@ const FileList: React.FC<{}> = () => {
                                         !isDeleting && !isSaving
                                             ? 'bg-red-600 text-white cursor-pointer hover:bg-red-700'
                                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    }`}
+                                        }`}
                                 >
                                     {isDeleting ? 'Deleting...' : 'Delete File'}
                                 </button>
