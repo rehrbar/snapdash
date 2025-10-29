@@ -15,18 +15,23 @@ declare global {
  * Middleware to resolve the current project based on the hostname
  * Attaches the project object to req.project if found
  */
-export const projectResolver = (req: Request, res: Response, next: NextFunction) => {
-    // Get the hostname from the request
-    const hostname = req.hostname;
+export const projectResolver = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        // Get the hostname from the request
+        const hostname = req.hostname;
 
-    // Find the project that matches this hostname from database
-    const project = projectService.findProjectByHost(hostname);
+        // Find the project that matches this hostname from database
+        const project = await projectService.findProjectByHost(hostname);
 
-    if (project) {
-        // Attach the project to the request context
-        req.project = project;
+        if (project) {
+            // Attach the project to the request context
+            req.project = project;
+        }
+
+        // Continue to the next middleware/route handler
+        next();
+    } catch (error) {
+        console.error("Error resolving project:", error);
+        next(error);
     }
-
-    // Continue to the next middleware/route handler
-    next();
 };

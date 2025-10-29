@@ -1,37 +1,54 @@
-import Database from "better-sqlite3";
-import path from "path";
-import { mkdirSync } from "fs";
-import { fileURLToPath } from "url";
+import pg from "pg";
 
-// Initialize database connection
-const dbPath = path.join(process.cwd(), "data", "projects.db");
+const { Pool } = pg;
 
-// Create parent directories of database location.
-mkdirSync(path.dirname(dbPath), { recursive: true });
-export const db = new Database(dbPath);
+// Initialize PostgreSQL connection pool
+export const pool = new Pool({
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME || 'snapdash',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+});
 
-// Enable foreign keys
-db.pragma("foreign_keys = ON");
+function delay(time: number) {
+    return new Promise(resolve => setTimeout(resolve, time));
+}
+
+export async function waitForDatabase() {
+    for (let i = 0; i < 10; i++) {
+        try {
+            await pool.query('SELECT NOW()');
+            return;
+        } catch {
+            console.log("Database not ready, try again...");
+            await delay(2000);
+        }
+    }
+}
 
 /**
  * Initialize database schema
  */
-export function initializeDatabase() {
+export async function initializeDatabase() {
     // Create projects table
-    db.exec(`
+    await pool.query(`
         CREATE TABLE IF NOT EXISTS projects (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             color TEXT NOT NULL,
             folder TEXT NOT NULL UNIQUE,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `);
 
     // Create project_hosts table (one-to-many relationship)
-    db.exec(`
+    await pool.query(`
         CREATE TABLE IF NOT EXISTS project_hosts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             project_id INTEGER NOT NULL,
             host TEXT NOT NULL UNIQUE,
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -39,9 +56,11 @@ export function initializeDatabase() {
     `);
 
     // Create indexes for performance
-    db.exec(`
-        CREATE INDEX IF NOT EXISTS idx_project_hosts_host ON project_hosts(host);
-        CREATE INDEX IF NOT EXISTS idx_project_hosts_project_id ON project_hosts(project_id);
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_project_hosts_host ON project_hosts(host)
+    `);
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_project_hosts_project_id ON project_hosts(project_id)
     `);
 
     console.log("Database initialized successfully");
@@ -50,30 +69,45 @@ export function initializeDatabase() {
 /**
  * Seed database with initial data if empty
  */
-export function seedDatabase() {
-    const count = db.prepare("SELECT COUNT(*) as count FROM projects").get() as { count: number };
+export async function seedDatabase() {
+    const result = await pool.query("SELECT COUNT(*) as count FROM projects");
+    const count = parseInt(result.rows[0].count);
 
-    if (count.count === 0) {
+    if (count === 0) {
         console.log("Seeding database with initial projects...");
 
-        const insertProject = db.prepare(`
-            INSERT INTO projects (name, color, folder)
-            VALUES (?, ?, ?)
-        `);
-
-        const insertHost = db.prepare(`
-            INSERT INTO project_hosts (project_id, host)
-            VALUES (?, ?)
-        `);
-
         // Seed demo project
-        const demoResult = insertProject.run("demo", "#07b379ff", "demo");
-        insertHost.run(demoResult.lastInsertRowid, "localhost");
-        insertHost.run(demoResult.lastInsertRowid, "demo.lvh.me");
+        const demoResult = await pool.query(`
+            INSERT INTO projects (name, color, folder)
+            VALUES ($1, $2, $3)
+            RETURNING id
+        `, ["demo", "#07b379ff", "demo"]);
+
+        const demoId = demoResult.rows[0].id;
+
+        await pool.query(`
+            INSERT INTO project_hosts (project_id, host)
+            VALUES ($1, $2)
+        `, [demoId, "localhost"]);
+
+        await pool.query(`
+            INSERT INTO project_hosts (project_id, host)
+            VALUES ($1, $2)
+        `, [demoId, "demo.lvh.me"]);
 
         // Seed explorer project
-        const explorerResult = insertProject.run("The explorer", "#0743b3ff", "the-explorer");
-        insertHost.run(explorerResult.lastInsertRowid, "explorer.lvh.me");
+        const explorerResult = await pool.query(`
+            INSERT INTO projects (name, color, folder)
+            VALUES ($1, $2, $3)
+            RETURNING id
+        `, ["The explorer", "#0743b3ff", "the-explorer"]);
+
+        const explorerId = explorerResult.rows[0].id;
+
+        await pool.query(`
+            INSERT INTO project_hosts (project_id, host)
+            VALUES ($1, $2)
+        `, [explorerId, "explorer.lvh.me"]);
 
         console.log("Database seeded successfully");
     }

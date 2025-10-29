@@ -36,7 +36,7 @@ projectsRouter.use(cors());
  * POST /api/projects
  * Create a new project
  */
-projectsRouter.post("/projects", (req: Request, res: Response) => {
+projectsRouter.post("/projects", async (req: Request, res: Response) => {
     try {
         // Validate request body with Zod
         const validationResult = createProjectSchema.safeParse(req.body);
@@ -52,7 +52,10 @@ projectsRouter.post("/projects", (req: Request, res: Response) => {
         const { hosts, name, color } = validationResult.data;
 
         // Check if any of the hosts already exist
-        const duplicateHosts = hosts.filter(h => projectService.hostExists(h));
+        const duplicateHostChecks = await Promise.all(
+            hosts.map(async h => ({ host: h, exists: await projectService.hostExists(h) }))
+        );
+        const duplicateHosts = duplicateHostChecks.filter(h => h.exists).map(h => h.host);
 
         if (duplicateHosts.length > 0) {
             res.status(409).json({
@@ -63,7 +66,7 @@ projectsRouter.post("/projects", (req: Request, res: Response) => {
         }
 
         // Create the new project (folder name is auto-generated)
-        const newProject = projectService.createProject(name, color, hosts);
+        const newProject = await projectService.createProject(name, color, hosts);
 
         // Return success response
         res.status(201).json({
@@ -82,19 +85,26 @@ projectsRouter.post("/projects", (req: Request, res: Response) => {
  * GET /api/projects
  * List all projects
  */
-projectsRouter.get("/projects", (req: Request, res: Response) => {
-    const allProjects = projectService.getAllProjects();
-    res.json({
-        projects: allProjects,
-        count: allProjects.length
-    });
+projectsRouter.get("/projects", async (req: Request, res: Response) => {
+    try {
+        const allProjects = await projectService.getAllProjects();
+        res.json({
+            projects: allProjects,
+            count: allProjects.length
+        });
+    } catch (error) {
+        console.error("Error fetching projects:", error);
+        res.status(500).json({
+            error: "Internal server error"
+        });
+    }
 });
 
 /**
  * GET /api/projects/:id
  * Get a single project by ID
  */
-projectsRouter.get("/projects/:id", (req: Request, res: Response) => {
+projectsRouter.get("/projects/:id", async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id, 10);
 
@@ -105,7 +115,7 @@ projectsRouter.get("/projects/:id", (req: Request, res: Response) => {
             return;
         }
 
-        const project = projectService.findProjectById(id);
+        const project = await projectService.findProjectById(id);
 
         if (!project) {
             res.status(404).json({
@@ -129,7 +139,7 @@ projectsRouter.get("/projects/:id", (req: Request, res: Response) => {
  * PUT /api/projects/:id
  * Update an existing project
  */
-projectsRouter.put("/projects/:id", (req: Request, res: Response) => {
+projectsRouter.put("/projects/:id", async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id, 10);
 
@@ -155,7 +165,7 @@ projectsRouter.put("/projects/:id", (req: Request, res: Response) => {
 
         // If updating hosts, check for duplicates (excluding current project's hosts)
         if (updates.hosts) {
-            const currentProject = projectService.findProjectById(id);
+            const currentProject = await projectService.findProjectById(id);
             if (!currentProject) {
                 res.status(404).json({
                     error: "Project not found"
@@ -164,10 +174,16 @@ projectsRouter.put("/projects/:id", (req: Request, res: Response) => {
             }
 
             // Check if any of the new hosts are already used by other projects
-            const duplicateHosts = updates.hosts.filter(h => {
-                // Host is duplicate if it exists and is not in the current project's hosts
-                return projectService.hostExists(h) && !currentProject.hosts.includes(h);
-            });
+            const duplicateHostChecks = await Promise.all(
+                updates.hosts.map(async h => ({
+                    host: h,
+                    exists: await projectService.hostExists(h),
+                    inCurrentProject: currentProject.hosts.includes(h)
+                }))
+            );
+            const duplicateHosts = duplicateHostChecks
+                .filter(h => h.exists && !h.inCurrentProject)
+                .map(h => h.host);
 
             if (duplicateHosts.length > 0) {
                 res.status(409).json({
@@ -179,7 +195,7 @@ projectsRouter.put("/projects/:id", (req: Request, res: Response) => {
         }
 
         // Update the project
-        const updatedProject = projectService.updateProject(id, updates);
+        const updatedProject = await projectService.updateProject(id, updates);
 
         if (!updatedProject) {
             res.status(404).json({
@@ -204,7 +220,7 @@ projectsRouter.put("/projects/:id", (req: Request, res: Response) => {
  * DELETE /api/projects/:id
  * Delete a project
  */
-projectsRouter.delete("/projects/:id", (req: Request, res: Response) => {
+projectsRouter.delete("/projects/:id", async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id, 10);
 
@@ -215,7 +231,7 @@ projectsRouter.delete("/projects/:id", (req: Request, res: Response) => {
             return;
         }
 
-        const deleted = projectService.deleteProject(id);
+        const deleted = await projectService.deleteProject(id);
 
         if (!deleted) {
             res.status(404).json({
@@ -239,7 +255,7 @@ projectsRouter.delete("/projects/:id", (req: Request, res: Response) => {
  * POST /api/projects/transfer-host
  * Transfer a hostname from one project to another
  */
-projectsRouter.post("/projects/transfer-host", (req: Request, res: Response) => {
+projectsRouter.post("/projects/transfer-host", async (req: Request, res: Response) => {
     try {
         // Validate request body with Zod
         const validationResult = transferHostSchema.safeParse(req.body);
@@ -255,7 +271,7 @@ projectsRouter.post("/projects/transfer-host", (req: Request, res: Response) => 
         const { host, targetProjectId } = validationResult.data;
 
         // Check if host exists
-        if (!projectService.hostExists(host)) {
+        if (!(await projectService.hostExists(host))) {
             res.status(404).json({
                 error: "Host not found"
             });
@@ -263,7 +279,7 @@ projectsRouter.post("/projects/transfer-host", (req: Request, res: Response) => 
         }
 
         // Transfer the host
-        const transferred = projectService.transferHost(host, targetProjectId);
+        const transferred = await projectService.transferHost(host, targetProjectId);
 
         if (!transferred) {
             res.status(404).json({
@@ -328,7 +344,7 @@ projectsRouter.get("/projects/:id/files", async (req: Request, res: Response) =>
             return;
         }
 
-        const project = projectService.findProjectById(id);
+        const project = await projectService.findProjectById(id);
 
         if (!project) {
             res.status(404).json({
@@ -382,7 +398,7 @@ projectsRouter.get("/projects/:id/file", async (req: Request, res: Response) => 
             return;
         }
 
-        const project = projectService.findProjectById(id);
+        const project = await projectService.findProjectById(id);
 
         if (!project) {
             res.status(404).json({
@@ -461,7 +477,7 @@ projectsRouter.put("/projects/:id/file", async (req: Request, res: Response) => 
             return;
         }
 
-        const project = projectService.findProjectById(id);
+        const project = await projectService.findProjectById(id);
 
         if (!project) {
             res.status(404).json({
@@ -535,7 +551,7 @@ projectsRouter.delete("/projects/:id/file", async (req: Request, res: Response) 
             return;
         }
 
-        const project = projectService.findProjectById(id);
+        const project = await projectService.findProjectById(id);
 
         if (!project) {
             res.status(404).json({

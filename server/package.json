@@ -12,13 +12,13 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "better-sqlite3": "^12.4.1",
+    "@types/pg": "^8.15.6",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "pg": "^8.16.3",
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^24.7.2",
