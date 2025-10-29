@@ -35,7 +35,7 @@ const FileList: React.FC<{}> = () => {
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const loadFiles = async () => {
+    const loadFiles = async (projectId: number) => {
         setLoading(true);
         setError(null);
         try {
@@ -48,9 +48,8 @@ const FileList: React.FC<{}> = () => {
         }
     };
 
-    // TODO fix this eslint warning
     useEffect(() => {
-        loadFiles();
+        loadFiles(projectId);
     }, [projectId]);
 
     const handleFileSelect = async (filePath: string) => {
@@ -97,7 +96,7 @@ const FileList: React.FC<{}> = () => {
             if (editedFileName !== selectedFile) {
                 setSelectedFile(editedFileName);
                 // Refresh file list to show the new file
-                await loadFiles();
+                await loadFiles(projectId);
             }
 
             setSaveSuccess(true);
@@ -126,7 +125,7 @@ const FileList: React.FC<{}> = () => {
             setFileContent("");
             setEditedContent("");
             // Refresh the file list
-            await loadFiles();
+            await loadFiles(projectId);
         } catch (err) {
             setContentError(err instanceof Error ? err.message : 'Failed to delete file');
         } finally {
@@ -138,7 +137,7 @@ const FileList: React.FC<{}> = () => {
         try {
             await updateFileContent(projectId, "index.html", seedIndexHtml);
             // Refresh the file list
-            await loadFiles();
+            await loadFiles(projectId);
         } catch (err) {
             setContentError(err instanceof Error ? err.message : 'Failed to save file');
         }
