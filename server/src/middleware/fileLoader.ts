@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import path from "path";
-import fs from "fs/promises";
+import * as fileAccessService from "../services/fileAccessService.js";
+import { FileNotFoundError, AccessDeniedError } from "../services/errors.js";
 
 /**
  * Middleware to load and serve files from the project's data folder
@@ -15,18 +16,16 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
         }
 
         // Get the requested path, default to index.html if root
-        let requestedPath = req.path === "/" ? "/index.html" : req.path;
+        let requestedPath = req.path === "/" ? "index.html" : req.path;
 
-        // Remove leading slash for path.join
+        // Remove leading slash
         requestedPath = requestedPath.startsWith("/") ? requestedPath.slice(1) : requestedPath;
 
-        // Build the full file path
-        const filePath = path.join(process.cwd(), "data", req.project.folder, requestedPath);
+        // Build the full file path using the service
+        const filePath = fileAccessService.buildProjectPath(req.project, requestedPath);
 
-        // Security check: ensure the resolved path is within the project's folder
-        const dataDir = path.join(process.cwd(), "data", req.project.folder);
-        const resolvedPath = path.resolve(filePath);
-        if (!resolvedPath.startsWith(dataDir)) {
+        // Security check using the service
+        if (!fileAccessService.validatePathSecurity(filePath, req.project)) {
             return res.status(403).json({ error: "Access denied" });
         }
 
@@ -39,14 +38,13 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
             return;
         }
 
-        // Read the file (as text or binary)
-        const fileContent = await fs.readFile(filePath, "utf-8")
+        // Read the file using the service
+        const fileContent = await fileAccessService.readFile(req.project, requestedPath);
 
         res.setHeader("Content-Type", "text/html");
 
-        const layoutPath = path.join(process.cwd(), "data", req.project.folder, "_layout.html");
         try {
-            const layoutContent = await fs.readFile(layoutPath, "utf-8");
+            const layoutContent = await fileAccessService.readFile(req.project, "_layout.html");
 
             // Replace {{content}} with the actual file content
             let renderedContent = layoutContent.replace("{{content}}", fileContent);
@@ -67,15 +65,20 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
             res.send(renderedContent);
         } catch (layoutError: any) {
             // If _layout.html doesn't exist, just serve the file as-is
-            if (layoutError.code !== "ENOENT") {
+            if (!(layoutError instanceof FileNotFoundError)) {
                 console.error("Error loading layout:", layoutError);
             }
             res.send(fileContent);
         }
     } catch (error: any) {
         // If file not found, pass to next middleware/route handler
-        if (error.code === "ENOENT") {
+        if (error instanceof FileNotFoundError) {
             return next();
+        }
+
+        // If access denied, return 403
+        if (error instanceof AccessDeniedError) {
+            return res.status(403).json({ error: "Access denied" });
         }
 
         // For other errors, return 500

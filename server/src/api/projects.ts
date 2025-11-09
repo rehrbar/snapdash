@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import * as projectService from "../db/projectService.js";
+import * as fileAccessService from "../services/fileAccessService.js";
+import { FileNotFoundError, PathNotFileError, AccessDeniedError } from "../services/errors.js";
 import cors from "cors";
-import path from "path";
-import fs from "fs/promises";
 
 // Create a new router for project API endpoints
 export const projectsRouter = Router();
@@ -302,34 +302,6 @@ projectsRouter.post("/projects/transfer-host", async (req: Request, res: Respons
 });
 
 /**
- * Helper function to recursively list all files in a directory
- */
-async function listFilesRecursively(dirPath: string, baseDir: string): Promise<string[]> {
-    const files: string[] = [];
-
-    try {
-        const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
-        for (const entry of entries) {
-            const fullPath = path.join(dirPath, entry.name);
-
-            if (entry.isDirectory()) {
-                const subFiles = await listFilesRecursively(fullPath, baseDir);
-                files.push(...subFiles);
-            } else if (entry.isFile()) {
-                // Get relative path from base directory
-                const relativePath = path.relative(baseDir, fullPath);
-                files.push(relativePath);
-            }
-        }
-    } catch (error) {
-        console.error(`Error reading directory ${dirPath}:`, error);
-    }
-
-    return files;
-}
-
-/**
  * GET /api/projects/:id/files
  * List all files in a project
  */
@@ -353,22 +325,8 @@ projectsRouter.get("/projects/:id/files", async (req: Request, res: Response) =>
             return;
         }
 
-        // Build the project folder path
-        const projectPath = path.join(process.cwd(), "data", project.folder);
-
-        // Check if directory exists
-        try {
-            await fs.access(projectPath);
-        } catch {
-            res.json({
-                project: project.name,
-                files: []
-            });
-            return;
-        }
-
-        // List all files recursively
-        const files = await listFilesRecursively(projectPath, projectPath);
+        // List all files using the service
+        const files = await fileAccessService.listFiles(project);
 
         res.json({
             project: project.name,
@@ -417,44 +375,36 @@ projectsRouter.get("/projects/:id/file", async (req: Request, res: Response) => 
             return;
         }
 
-        // Build the full file path
-        const projectPath = path.join(process.cwd(), "data", project.folder);
-        const fullFilePath = path.join(projectPath, filePath);
-
-        // Security check: ensure the resolved path is within the project's folder
-        const resolvedPath = path.resolve(fullFilePath);
-        if (!resolvedPath.startsWith(projectPath)) {
-            res.status(403).json({
-                error: "Access denied"
-            });
-            return;
-        }
-
-        // Check if file exists and is a file
-        try {
-            const stats = await fs.stat(fullFilePath);
-            if (!stats.isFile()) {
-                res.status(400).json({
-                    error: "Path is not a file"
-                });
-                return;
-            }
-        } catch {
-            res.status(404).json({
-                error: "File not found"
-            });
-            return;
-        }
-
-        // Read file content
-        const content = await fs.readFile(fullFilePath, "utf-8");
+        // Read file content using the service (validates file exists and is a file)
+        const content = await fileAccessService.readFile(project, filePath);
 
         res.json({
             project: project.name,
             path: filePath,
             content
         });
-    } catch (error) {
+    } catch (error: any) {
+        if (error instanceof AccessDeniedError) {
+            res.status(403).json({
+                error: "Access denied"
+            });
+            return;
+        }
+
+        if (error instanceof FileNotFoundError) {
+            res.status(404).json({
+                error: "File not found"
+            });
+            return;
+        }
+
+        if (error instanceof PathNotFileError) {
+            res.status(400).json({
+                error: "Path is not a file"
+            });
+            return;
+        }
+
         console.error("Error reading file:", error);
         res.status(500).json({
             error: "Internal server error"
@@ -503,32 +453,22 @@ projectsRouter.put("/projects/:id/file", async (req: Request, res: Response) => 
             return;
         }
 
-        // Build the full file path
-        const projectPath = path.join(process.cwd(), "data", project.folder);
-        const fullFilePath = path.join(projectPath, filePath);
-
-        // Security check: ensure the resolved path is within the project's folder
-        const resolvedPath = path.resolve(fullFilePath);
-        if (!resolvedPath.startsWith(projectPath)) {
-            res.status(403).json({
-                error: "Access denied"
-            });
-            return;
-        }
-
-        // Ensure parent directory exists
-        const parentDir = path.dirname(fullFilePath);
-        await fs.mkdir(parentDir, { recursive: true });
-
-        // Write the file (overwrites if exists)
-        await fs.writeFile(fullFilePath, content, "utf-8");
+        // Write the file using the service (includes security checks)
+        await fileAccessService.writeFile(project, filePath, content);
 
         res.json({
             message: "File saved successfully",
             project: project.name,
             path: filePath
         });
-    } catch (error) {
+    } catch (error: any) {
+        if (error instanceof AccessDeniedError) {
+            res.status(403).json({
+                error: "Access denied"
+            });
+            return;
+        }
+
         console.error("Error writing file:", error);
         res.status(500).json({
             error: "Internal server error"
@@ -570,44 +510,36 @@ projectsRouter.delete("/projects/:id/file", async (req: Request, res: Response) 
             return;
         }
 
-        // Build the full file path
-        const projectPath = path.join(process.cwd(), "data", project.folder);
-        const fullFilePath = path.join(projectPath, filePath);
-
-        // Security check: ensure the resolved path is within the project's folder
-        const resolvedPath = path.resolve(fullFilePath);
-        if (!resolvedPath.startsWith(projectPath)) {
-            res.status(403).json({
-                error: "Access denied"
-            });
-            return;
-        }
-
-        // Check if file exists and is a file
-        try {
-            const stats = await fs.stat(fullFilePath);
-            if (!stats.isFile()) {
-                res.status(400).json({
-                    error: "Path is not a file"
-                });
-                return;
-            }
-        } catch {
-            res.status(404).json({
-                error: "File not found"
-            });
-            return;
-        }
-
-        // Delete the file
-        await fs.unlink(fullFilePath);
+        // Delete the file using the service (validates file exists and is a file)
+        await fileAccessService.deleteFile(project, filePath);
 
         res.json({
             message: "File deleted successfully",
             project: project.name,
             path: filePath
         });
-    } catch (error) {
+    } catch (error: any) {
+        if (error instanceof AccessDeniedError) {
+            res.status(403).json({
+                error: "Access denied"
+            });
+            return;
+        }
+
+        if (error instanceof FileNotFoundError) {
+            res.status(404).json({
+                error: "File not found"
+            });
+            return;
+        }
+
+        if (error instanceof PathNotFileError) {
+            res.status(400).json({
+                error: "Path is not a file"
+            });
+            return;
+        }
+
         console.error("Error deleting file:", error);
         res.status(500).json({
             error: "Internal server error"
