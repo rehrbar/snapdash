@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import path from "path";
+import mime from "mime-types";
 import * as fileAccessService from "../services/fileAccessService.js";
-import { FileNotFoundError, AccessDeniedError } from "../services/errors.js";
+import { FileNotFoundError, AccessDeniedError, PathNotFileError } from "../services/errors.js";
 
 /**
  * Middleware to load and serve files from the project's data folder
@@ -21,20 +22,28 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
         // Remove leading slash
         requestedPath = requestedPath.startsWith("/") ? requestedPath.slice(1) : requestedPath;
 
-        // Build the full file path using the service
-        const filePath = fileAccessService.buildProjectPath(req.project, requestedPath);
-
-        // Security check using the service
-        if (!fileAccessService.validatePathSecurity(filePath, req.project)) {
-            return res.status(403).json({ error: "Access denied" });
-        }
-
         // Determine content type based on file extension
-        const ext = path.extname(filePath).toLowerCase();
+        const ext = path.extname(requestedPath).toLowerCase();
 
-        // Only HTML files are rendered, others can be sent directly.
+        // Non-HTML files are streamed directly
         if (ext !== ".html") {
-            res.sendFile(filePath);
+            // Create read stream through the service (includes security validation)
+            const stream = await fileAccessService.createReadStream(req.project, requestedPath);
+
+            // Set Content-Type header
+            const contentType = mime.lookup(requestedPath) || "application/octet-stream";
+            res.setHeader("Content-Type", contentType);
+
+            // Handle stream errors
+            stream.on("error", (error) => {
+                console.error("Stream error:", error);
+                if (!res.headersSent) {
+                    res.status(500).json({ error: "Error streaming file" });
+                }
+            });
+
+            // Pipe the stream to the response
+            stream.pipe(res);
             return;
         }
 
@@ -79,6 +88,11 @@ export const fileLoader = async (req: Request, res: Response, next: NextFunction
         // If access denied, return 403
         if (error instanceof AccessDeniedError) {
             return res.status(403).json({ error: "Access denied" });
+        }
+
+        // If path is not a file (e.g., it's a directory), return 400
+        if (error instanceof PathNotFileError) {
+            return res.status(400).json({ error: "Path is not a file" });
         }
 
         // For other errors, return 500

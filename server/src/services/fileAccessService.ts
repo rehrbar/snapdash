@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs/promises";
+import * as fsSync from "fs";
 import { Project } from "../db/projects.js";
 import { FileNotFoundError, PathNotFileError, AccessDeniedError } from "./errors.js";
 
@@ -120,6 +121,42 @@ export async function deleteFile(project: Project, filePath: string): Promise<vo
     }
 
     await fs.unlink(fullPath);
+}
+
+/**
+ * Create a read stream for a file in the project's folder
+ * Useful for streaming binary files or large files efficiently
+ * @param project - The project object
+ * @param filePath - The relative path to the file within the project
+ * @returns A readable stream for the file
+ * @throws {AccessDeniedError} if path is outside project folder
+ * @throws {FileNotFoundError} if file doesn't exist
+ * @throws {PathNotFileError} if path is not a file
+ */
+export async function createReadStream(project: Project, filePath: string): Promise<fsSync.ReadStream> {
+    const fullPath = buildProjectPath(project, filePath);
+
+    if (!validatePathSecurity(fullPath, project)) {
+        throw new AccessDeniedError();
+    }
+
+    // Check if file exists and is a file before creating stream
+    try {
+        const stats = await fs.stat(fullPath);
+        if (!stats.isFile()) {
+            throw new PathNotFileError();
+        }
+    } catch (error: any) {
+        if (error.code === "ENOENT") {
+            throw new FileNotFoundError();
+        }
+        if (error instanceof PathNotFileError) {
+            throw error;
+        }
+        throw error;
+    }
+
+    return fsSync.createReadStream(fullPath);
 }
 
 /**
