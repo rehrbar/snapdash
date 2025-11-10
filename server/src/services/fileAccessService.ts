@@ -90,6 +90,28 @@ export async function writeFile(project: Project, filePath: string, content: str
 }
 
 /**
+ * Write binary data to a file in the project's folder
+ * Creates parent directories if they don't exist
+ * @param project - The project object
+ * @param filePath - The relative path to the file within the project
+ * @param buffer - The binary data to write
+ * @throws {AccessDeniedError} if path is outside project folder
+ */
+export async function writeBinaryFile(project: Project, filePath: string, buffer: Buffer): Promise<void> {
+    const fullPath = buildProjectPath(project, filePath);
+
+    if (!validatePathSecurity(fullPath, project)) {
+        throw new AccessDeniedError();
+    }
+
+    // Ensure parent directory exists
+    const parentDir = path.dirname(fullPath);
+    await fs.mkdir(parentDir, { recursive: true });
+
+    await fs.writeFile(fullPath, buffer);
+}
+
+/**
  * Delete a file from the project's folder
  * @param project - The project object
  * @param filePath - The relative path to the file within the project

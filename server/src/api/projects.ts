@@ -4,6 +4,7 @@ import * as projectService from "../db/projectService.js";
 import * as fileAccessService from "../services/fileAccessService.js";
 import { FileNotFoundError, PathNotFileError, AccessDeniedError } from "../services/errors.js";
 import cors from "cors";
+import multer from "multer";
 
 // Create a new router for project API endpoints
 export const projectsRouter = Router();
@@ -31,6 +32,14 @@ const transferHostSchema = z.object({
 });
 
 projectsRouter.use(cors());
+
+// Configure multer for file uploads (store in memory)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
 
 /**
  * POST /api/projects
@@ -541,6 +550,66 @@ projectsRouter.delete("/projects/:id/file", async (req: Request, res: Response) 
         }
 
         console.error("Error deleting file:", error);
+        res.status(500).json({
+            error: "Internal server error"
+        });
+    }
+});
+
+/**
+ * POST /api/projects/:id/upload
+ * Upload a file to a project (uses original filename)
+ */
+projectsRouter.post("/projects/:id/upload", upload.single("file"), async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+
+        if (isNaN(id)) {
+            res.status(400).json({
+                error: "Invalid project ID"
+            });
+            return;
+        }
+
+        const project = await projectService.findProjectById(id);
+
+        if (!project) {
+            res.status(404).json({
+                error: "Project not found"
+            });
+            return;
+        }
+
+        // Check if file was uploaded
+        if (!req.file) {
+            res.status(400).json({
+                error: "No file uploaded"
+            });
+            return;
+        }
+
+        // Use the original filename
+        const filename = req.file.originalname;
+
+        // Write the file using the service (includes security checks)
+        await fileAccessService.writeBinaryFile(project, filename, req.file.buffer);
+
+        res.json({
+            message: "File uploaded successfully",
+            project: project.name,
+            path: filename,
+            size: req.file.size,
+            mimetype: req.file.mimetype
+        });
+    } catch (error: any) {
+        if (error instanceof AccessDeniedError) {
+            res.status(403).json({
+                error: "Access denied"
+            });
+            return;
+        }
+
+        console.error("Error uploading file:", error);
         res.status(500).json({
             error: "Internal server error"
         });

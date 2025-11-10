@@ -139,3 +139,28 @@ export const deleteFile = async (id: number, filePath: string): Promise<void> =>
         throw new Error('Failed to delete file');
     }
 };
+
+export interface UploadFileResponse {
+    message: string;
+    project: string;
+    path: string;
+    size: number;
+    mimetype: string;
+}
+
+/**
+ * Upload a file to a project (uses original filename)
+ */
+export const uploadFile = async (id: number, file: File): Promise<UploadFileResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${config.baseUrl}/api/projects/${id}/upload`, {
+        method: 'POST',
+        body: formData
+    });
+    if (!response.ok) {
+        throw new Error('Failed to upload file');
+    }
+    return response.json();
+};

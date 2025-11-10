@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getProjectFiles, ProjectFilesResponse, getFileContent, updateFileContent, deleteFile } from "../services/api";
+import { getProjectFiles, ProjectFilesResponse, getFileContent, updateFileContent, deleteFile, uploadFile } from "../services/api";
 import React from "react";
 import { useParams } from "react-router";
 
@@ -34,6 +34,12 @@ const FileList: React.FC<{}> = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // File upload states
+    const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [uploadSuccess, setUploadSuccess] = useState(false);
 
     const loadFiles = async (projectId: number) => {
         setLoading(true);
@@ -143,6 +149,38 @@ const FileList: React.FC<{}> = () => {
         }
     }
 
+    const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] || null;
+        setSelectedUploadFile(file);
+        setUploadError(null);
+        setUploadSuccess(false);
+    };
+
+    const handleUpload = async () => {
+        if (!selectedUploadFile) return;
+
+        setIsUploading(true);
+        setUploadError(null);
+        setUploadSuccess(false);
+
+        try {
+            await uploadFile(projectId, selectedUploadFile);
+            setUploadSuccess(true);
+            setSelectedUploadFile(null);
+            // Clear the file input
+            const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            // Refresh the file list
+            await loadFiles(projectId);
+        } catch (err) {
+            setUploadError(err instanceof Error ? err.message : 'Failed to upload file');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const isDirty = fileContent !== editedContent || editedFileName !== selectedFile;
 
     if(Number.isNaN(projectId)) {
@@ -187,6 +225,48 @@ const FileList: React.FC<{}> = () => {
                                 </li>
                             ))}
                         </ul>
+                    </div>
+
+                    {/* File Upload Section */}
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded">
+                        <h3 className="font-semibold mb-3">Upload File</h3>
+
+                        {uploadError && (
+                            <div className="text-red-600 p-3 bg-red-50 border border-red-200 rounded mb-3">
+                                Error: {uploadError}
+                            </div>
+                        )}
+
+                        {uploadSuccess && (
+                            <div className="text-green-600 p-3 bg-green-50 border border-green-200 rounded mb-3">
+                                File uploaded successfully!
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 items-center">
+                            <input
+                                type="file"
+                                onChange={handleFileInputChange}
+                                disabled={isUploading}
+                                className="flex-1 text-sm"
+                            />
+                            <button
+                                onClick={handleUpload}
+                                disabled={!selectedUploadFile || isUploading}
+                                className={`px-4 py-2 rounded ${
+                                    selectedUploadFile && !isUploading
+                                        ? 'bg-blue-600 text-white cursor-pointer hover:bg-blue-700'
+                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                }`}
+                            >
+                                {isUploading ? 'Uploading...' : 'Upload'}
+                            </button>
+                        </div>
+                        {selectedUploadFile && (
+                            <p className="text-sm text-gray-600 mt-2">
+                                Selected: {selectedUploadFile.name} ({(selectedUploadFile.size / 1024).toFixed(2)} KB)
+                            </p>
+                        )}
                     </div>
                 </div>
 
