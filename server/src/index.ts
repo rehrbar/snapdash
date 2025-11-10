@@ -3,6 +3,7 @@ import { projectResolver } from "./middleware/projectResolver.js";
 import { fileLoader } from "./middleware/fileLoader.js";
 import { projectsRouter } from "./api/projects.js";
 import { initializeDatabase, seedDatabase, waitForDatabase } from "./db/database.js";
+import { initializeBucket, waitForS3 } from "./services/fileAccessService.js";
 
 // Async initialization function
 async function startServer() {
@@ -10,6 +11,10 @@ async function startServer() {
     // Initialize database
     await initializeDatabase();
     await seedDatabase();
+
+    // Initialize storage
+    await waitForS3();
+    await initializeBucket();
 
     // Create a new express application instance
     const app = express();

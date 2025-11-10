@@ -1,0 +1,18 @@
+{
+  "identities": [
+    {
+      "name": "snapdash",
+      "credentials": [
+        {
+          "accessKey": "snapdash-access-key",
+          "secretKey": "snapdash-secret-key"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write"
+      ]
+    }
+  ]
+}

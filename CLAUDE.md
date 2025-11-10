@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 SnapDash is a multi-project rapid web development platform with two main components:
-- **Server**: Express and TypeScript backend API with SQLite database for project management
+- **Server**: Express and TypeScript backend API with PostgreSQL database for project management and S3-compatible storage (SeaweedFS) for file storage
 - **Admin UI**: React-based admin UI for managing projects
 
 ## Project Structure
@@ -93,19 +93,23 @@ Launches the test runner in interactive watch mode using React Testing Library.
 - **Runtime**: Node.js with ES modules (`"type": "module"`)
 - **Framework**: Express 5.x
 - **Language**: TypeScript with strict mode enabled
-- **Database**: SQLite (better-sqlite3)
+- **Database**: PostgreSQL (via pg driver)
+- **Storage**: S3-compatible storage using SeaweedFS (default) or filesystem (legacy)
+- **S3 Client**: AWS SDK for JavaScript v3 (@aws-sdk/client-s3)
 - **Validation**: Zod
 - **File Upload**: Multer (with memory storage, 10MB limit)
 - **Dev Tooling**: tsx for development with watch mode
 
 ### Application Entry Point
 The application is an Express server (`server/src/index.ts`) that:
-- Initializes SQLite database with project schema
+- Waits for database connection
+- Initializes PostgreSQL database with project schema
+- Initializes S3 storage (or filesystem storage if configured)
 - Creates an Express app instance
 - Configures port from `process.env.PORT` (defaults to 3001)
 - Mounts project management API routes at `/api/projects`
 - Applies project resolution middleware for host-based routing
-- Serves static files from project-specific folders
+- Serves static files from project-specific S3 storage
 - Starts listening on the configured port
 
 ### TypeScript Configuration
@@ -133,15 +137,51 @@ The application is an Express server (`server/src/index.ts`) that:
 - `DELETE /api/projects/:id/file?path=xxx` - Delete a file
 - `POST /api/projects/:id/upload` - Upload a file (binary/images, uses original filename, 10MB limit)
 
-### File Access Service
-The `fileAccessService` provides secure file operations with path validation to prevent directory traversal attacks:
+### File Storage Service
+The file storage service (`fileAccessService`) uses S3-compatible object storage for all file operations:
+
+**Storage Implementation:**
+- Uses SeaweedFS (S3-compatible) by default
+- Compatible with any S3-compatible storage (AWS S3, MinIO, etc.)
+- Change the `S3_ENDPOINT` to use different storage backends
+
+**API:**
 - `writeFile()` - Write text content to files
 - `writeBinaryFile()` - Write binary data (Buffer) to files
 - `readFile()` - Read file content as text
 - `deleteFile()` - Delete files
 - `listFiles()` - Recursively list all files
-- All operations validate paths are within the project folder
+- `createReadStream()` - Stream files efficiently
+- `fileExists()` - Check if file exists
+- All operations validate paths to prevent directory traversal attacks
+
+**Features:**
+- Files stored in S3-compatible object storage (SeaweedFS by default)
+- Project files organized by folder prefix in a single bucket
+- Automatic bucket initialization on startup
+- Support for AWS S3, MinIO, or any S3-compatible storage
 
 ## Environment Variables
+
+See `server/.env.example` for all available configuration options. Key variables:
+
+**Server:**
 - `PORT`: Server port (default: 3001)
-- Additional environment variables can be added to `.env` file in the `server` directory (loaded automatically by npm start)
+
+**Database:**
+- `DB_HOST`: PostgreSQL host (default: localhost)
+- `DB_PORT`: PostgreSQL port (default: 5432)
+- `DB_NAME`: Database name (default: snapdash)
+- `DB_USER`: Database user (default: postgres)
+- `DB_PASSWORD`: Database password
+
+**S3 Storage:**
+- `S3_ENDPOINT`: S3 endpoint URL (e.g., http://seaweedfs:8333 for SeaweedFS)
+- `S3_REGION`: AWS region (default: us-east-1)
+- `S3_ACCESS_KEY`: S3 access key
+- `S3_SECRET_KEY`: S3 secret key
+- `S3_BUCKET`: S3 bucket name (default: snapdash-projects)
+
+## Storage Documentation
+
+For detailed information about the S3 storage configuration and troubleshooting, see [STORAGE.md](../STORAGE.md).
