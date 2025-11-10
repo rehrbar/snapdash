@@ -95,6 +95,7 @@ Launches the test runner in interactive watch mode using React Testing Library.
 - **Language**: TypeScript with strict mode enabled
 - **Database**: SQLite (better-sqlite3)
 - **Validation**: Zod
+- **File Upload**: Multer (with memory storage, 10MB limit)
 - **Dev Tooling**: tsx for development with watch mode
 
 ### Application Entry Point
@@ -114,6 +115,32 @@ The application is an Express server (`server/src/index.ts`) that:
 - **Source Maps**: Generated for debugging
 - **Output**: `./dist`
 - **Include**: All files in `src/**/*`
+
+## API Endpoints
+
+### Project Management
+- `POST /api/projects` - Create a new project
+- `GET /api/projects` - List all projects
+- `GET /api/projects/:id` - Get a single project
+- `PUT /api/projects/:id` - Update a project
+- `DELETE /api/projects/:id` - Delete a project
+- `POST /api/projects/transfer-host` - Transfer a hostname between projects
+
+### File Management
+- `GET /api/projects/:id/files` - List all files in a project
+- `GET /api/projects/:id/file?path=xxx` - Get file content
+- `PUT /api/projects/:id/file` - Update/create file content (text files)
+- `DELETE /api/projects/:id/file?path=xxx` - Delete a file
+- `POST /api/projects/:id/upload` - Upload a file (binary/images, uses original filename, 10MB limit)
+
+### File Access Service
+The `fileAccessService` provides secure file operations with path validation to prevent directory traversal attacks:
+- `writeFile()` - Write text content to files
+- `writeBinaryFile()` - Write binary data (Buffer) to files
+- `readFile()` - Read file content as text
+- `deleteFile()` - Delete files
+- `listFiles()` - Recursively list all files
+- All operations validate paths are within the project folder
 
 ## Environment Variables
 - `PORT`: Server port (default: 3001)
