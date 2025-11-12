@@ -9,8 +9,6 @@ services:
     depends_on:
       - db
       - seaweedfs
-    volumes:
-      - server-data:/app/data
     environment:
       DB_HOST: db
       DB_PASSWORD: tvn5p45n
@@ -50,6 +48,8 @@ services:
       timeout: 5s
       retries: 5
     restart: on-failure
+    volumes:
+      - db-data:/var/lib/postgresql/data
 
   adminer:
     image: docker.io/adminer
@@ -78,5 +78,5 @@ services:
 
 
 volumes:
-  server-data:
+  db-data:
   seaweedfs-data:
