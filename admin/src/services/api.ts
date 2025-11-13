@@ -164,3 +164,30 @@ export const uploadFile = async (id: number, file: File): Promise<UploadFileResp
     }
     return response.json();
 };
+
+export interface AssistantRequest {
+    prompt: string;
+    projectId: number;
+}
+
+export interface AssistantResponse {
+    response: string;
+    project: string;
+}
+
+/**
+ * Send a prompt to the Assistant for a specific project
+ */
+export const sendAssistantPrompt = async (prompt: string, projectId: number): Promise<AssistantResponse> => {
+    const response = await fetch(`${config.baseUrl}/api/assistant`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ prompt, projectId })
+    });
+    if (!response.ok) {
+        throw new Error('Failed to send Assistant prompt');
+    }
+    return response.json();
+};

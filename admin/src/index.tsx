@@ -6,6 +6,7 @@ import reportWebVitals from './reportWebVitals';
 import { BrowserRouter, Routes, Route } from 'react-router';
 import FileList from './components/FileList';
 import Navigation from './components/Navigation';
+import Assistant from './components/Assistant';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -17,6 +18,7 @@ root.render(
       <Routes>
         <Route index element={<App />} />
         <Route path='projects/:id/files' element={<FileList />} />
+        <Route path='assistant' element={<Assistant />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

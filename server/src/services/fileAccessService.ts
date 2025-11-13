@@ -391,7 +391,7 @@ export async function waitForS3(): Promise<void> {
             return;
         } catch {
             console.log("S3 is not ready, try again...");
-            await delay(2000);
+            await delay(5000);
         }
     }
 }

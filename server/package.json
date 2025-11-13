@@ -13,6 +13,7 @@
   "type": "module",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.928.0",
+    "@openai/agents": "^0.3.0",
     "@types/multer": "^2.0.0",
     "@types/pg": "^8.15.6",
     "cors": "^2.8.5",

@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import { projectResolver } from "./middleware/projectResolver.js";
 import { fileLoader } from "./middleware/fileLoader.js";
 import { projectsRouter } from "./api/projects.js";
+import { assistantRouter } from "./api/assistant.js";
 import { initializeDatabase, seedDatabase, waitForDatabase } from "./db/database.js";
 import { initializeBucket, waitForS3 } from "./services/fileAccessService.js";
 
@@ -27,6 +28,7 @@ async function startServer() {
 
     // Mount API routes
     app.use("/api", projectsRouter);
+    app.use("/api", assistantRouter);
 
     // Apply project resolution middleware globally
     app.use(projectResolver);
